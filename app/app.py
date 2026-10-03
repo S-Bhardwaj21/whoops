@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import snowflake.connector
+from cryptography.hazmat.primitives import serialization
 
 st.set_page_config(
     page_title="Cold Chain Command Center",
@@ -9,7 +10,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 st.markdown("""
 <style>
 .block-container {
@@ -71,14 +71,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+def get_private_key(config):
+    if "private_key" in config:
+        private_key = serialization.load_pem_private_key(
+            config["private_key"].encode(),
+            password=None,
+        )
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    private_key_path = Path(config["private_key_file"]).resolve()
+    return private_key_path.read_bytes()
+
 @st.cache_resource
 def get_connection():
     config = st.secrets["snowflake"]
-    private_key_path = Path(config["private_key_file"]).resolve()
     return snowflake.connector.connect(
         account=config["account"],
         user=config["user"],
-        private_key_file=str(private_key_path),
+        private_key=get_private_key(config),
         database=config["database"],
         schema=config["schema"],
         warehouse=config["warehouse"],
@@ -167,11 +180,10 @@ def get_audit(shipment_id):
 @st.cache_resource
 def get_quality_connection():
     config = st.secrets["snowflake"]
-    private_key_path = Path(config["private_key_file"]).resolve()
     return snowflake.connector.connect(
         account=config["account"],
         user=config["user"],
-        private_key_file=str(private_key_path),
+        private_key=get_private_key(config),
         database=config["database"],
         schema=config["schema"],
         warehouse=config["warehouse"],
@@ -258,22 +270,17 @@ Evidence:
 
 st.sidebar.title("Cold Chain")
 st.sidebar.caption("Compliance Command Center")
-
 page = st.sidebar.radio(
     "Navigate",
     ["Investigate Shipment", "Governance", "Audit Trail"],
 )
-
 st.sidebar.divider()
 st.sidebar.caption("Shipment")
-
 shipment_id = st.sidebar.selectbox(
     "Shipment",
     ["SH-101"],
 )
-
 st.sidebar.caption("Persona")
-
 persona = st.sidebar.selectbox(
     "View as",
     ["Quality", "Logistics", "Compliance"],
