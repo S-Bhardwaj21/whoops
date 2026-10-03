@@ -1538,7 +1538,4 @@ responsible for deciding what the enterprise's data means.
 
 ------------------------------------------------------------------------
 
-## License
 
-Add the project's chosen open-source license here before public
-distribution.
