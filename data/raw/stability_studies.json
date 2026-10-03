@@ -1,0 +1,2 @@
+{"study_id": "STAB-001", "batch_id": "B-12", "storage_min_c": 2.0, "storage_max_c": 8.0, "max_excursion_duration_min": 10, "requires_quality_review": true, "version": "2.1"}
+{"study_id": "STAB-002", "batch_id": "B-13", "storage_min_c": 2.0, "storage_max_c": 8.0, "max_excursion_duration_min": 10, "requires_quality_review": true, "version": "1.4"}

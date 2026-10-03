@@ -1,0 +1,2 @@
+-- Cortex Analyst configuration is granted in 07_governance.sql.
+-- No Cortex Agent or Streamlit application is deployed as a Snowflake object.

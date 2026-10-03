@@ -1,0 +1,3 @@
+snowflake_private_key.p8
+.streamlit/secrets.toml
+snowflake_public_key.txt

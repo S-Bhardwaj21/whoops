@@ -1,0 +1,2 @@
+{"product_id": "PROD-001", "name": "Vaccine-X", "category": "Biologic", "storage_min_c": 2.0, "storage_max_c": 8.0}
+{"product_id": "PROD-002", "name": "Therapy-Y", "category": "Biologic", "storage_min_c": 2.0, "storage_max_c": 8.0}

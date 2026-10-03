@@ -1,0 +1,2 @@
+{"shipment_id": "SH-101", "batch_id": "B-12", "order_id": "O-5001", "supplier_id": "SUP-001", "destination_customer_id": "C-001", "status": "DELIVERED", "legacy_compliance_flag": "COMPLIANT"}
+{"shipment_id": "SH-102", "batch_id": "B-13", "order_id": "O-5002", "supplier_id": "SUP-002", "destination_customer_id": "C-002", "status": "DELIVERED", "legacy_compliance_flag": "COMPLIANT"}
