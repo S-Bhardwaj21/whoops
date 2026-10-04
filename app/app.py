@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import json
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
+import altair as alt
 
 st.set_page_config(
     page_title="Cold Chain Command Center",
@@ -67,6 +69,13 @@ st.markdown("""
 .audit {
     padding: 0.8rem 1rem;
     border-bottom: 1px solid #ddd;
+}
+.coco-card {
+    padding: 1.2rem 1.4rem;
+    border-radius: 14px;
+    border: 1px solid #ddd;
+    background: #fafafa;
+    color: #111827;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -268,6 +277,82 @@ Evidence:
         return "AI explanation unavailable."
     return str(result["EXPLANATION"])
 
+def run_coco_assessment(shipment_id):
+    prompt = f"""Assess cold-chain compliance for shipment {shipment_id}. Use the assess_cold_chain_compliance skill. Return the governed compliance status, metric definition version, maximum temperature, excursion duration, governing evidence, conflicting source-system statuses, and any unresolved evidence gaps. Do not invent regulatory citations. Clearly distinguish internal SOP evidence from external regulation."""
+    request = {
+        "models": {
+            "orchestration": "auto"
+        },
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ],
+        "tools": [
+            {
+                "tool_spec": {
+                    "type": "code_toolset_all",
+                    "name": "code_toolset_all"
+                }
+            }
+        ],
+        "skills": [
+            {
+                "name": "assess_cold_chain_compliance",
+                "source": {
+                    "type": "STAGE",
+                    "path": "@COLD_CHAIN_COMPLIANCE.GOVERNANCE.COCO_SKILLS/skills/assess_cold_chain_compliance"
+                }
+            }
+        ],
+        "tool_resources": {
+            "code_toolset_all": {
+                "permission_policy": {
+                    "type": "always_allow"
+                }
+            }
+        }
+    }
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT SNOWFLAKE.CORTEX.AGENT_RUN(%s, TRUE) AS RESP",
+            (json.dumps(request),),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        result = row[0]
+        if isinstance(result, str):
+            try:
+                return json.loads(result)
+            except Exception:
+                return result
+        return result
+    finally:
+        cursor.close()
+
+def extract_coco_text(result):
+    text_blocks = []
+    def collect(obj):
+        if isinstance(obj, dict):
+            if obj.get("type") == "text" and obj.get("text"):
+                text_blocks.append(str(obj["text"]))
+            for value in obj.values():
+                collect(value)
+        elif isinstance(obj, list):
+            for value in obj:
+                collect(value)
+    collect(result)
+    return "\n\n".join(text_blocks)
+
 st.sidebar.title("Cold Chain")
 st.sidebar.caption("Compliance Command Center")
 page = st.sidebar.radio(
@@ -394,7 +479,6 @@ if page == "Investigate Shipment":
                 subset=["EVENT_TS", "TEMPERATURE_C"]
             )
             sensor_df = sensor_df.sort_values("EVENT_TS")
-            import altair as alt
             chart = alt.Chart(sensor_df).mark_line(
                 point=True
             ).encode(
@@ -461,6 +545,37 @@ if page == "Investigate Shipment":
                 """,
                 unsafe_allow_html=True,
             )
+    st.markdown(
+        '<div class="section"><h2>Hosted CoCo Assessment</h2></div>',
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        "Assess Shipment with CoCo",
+        type="primary",
+        use_container_width=True,
+    ):
+        with st.spinner("Running hosted CoCo assessment..."):
+            try:
+                coco_result = run_coco_assessment(shipment_id)
+                st.session_state["coco_result"] = coco_result
+                st.session_state["coco_shipment"] = shipment_id
+                st.success("CoCo assessment completed.")
+            except Exception as exc:
+                st.error("Hosted CoCo assessment failed.")
+                st.exception(exc)
+    if st.session_state.get("coco_shipment") == shipment_id and "coco_result" in st.session_state:
+        coco_text = extract_coco_text(st.session_state["coco_result"])
+        if coco_text:
+            st.markdown(
+                f"""
+                <div class="coco-card">
+                {coco_text.replace(chr(10), "<br>")}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.json(st.session_state["coco_result"])
     st.markdown(
         '<div class="section"><h2>AI Explanation</h2></div>',
         unsafe_allow_html=True,
@@ -623,3 +738,4 @@ else:
             "The original compliance decision is preserved in the audit trail. "
             "Resolution records are recorded separately rather than replacing the original decision."
         )
+
